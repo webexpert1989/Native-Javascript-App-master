@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta charset="UTF-8">
+	<title>Document</title>
+</head>
+
+<style>
+body {
+	margin: 0;
+	padding: 0;
+}
+.form-wrapper {
+	position: relative;
+	margin: 10px auto 10px auto;
+	width: 90%;
+	height: auto;
+	font-family: sans-serif;
+	font-size: 14px;
+	color: #333;
+	word-break: break-word;
+}
+.form-wrapper,
+.form-wrapper * {
+	box-sizing: border-box;
+}
+
+.form-wrapper section,
+.form-wrapper .form-header {
+	padding: 10px 5px;
+	line-height: 24px;
+}
+
+.form-wrapper section {
+	border-top: solid 2px #333;
+}
+
+.form-wrapper .select-words,
+.form-wrapper .green {
+	color: green;
+}
+.form-wrapper .red {
+	color: red;
+}
+
+.form-wrapper label.block-label {
+	display: block;
+}
+.form-wrapper label.strong {
+	font-weight: bold;
+}
+.form-wrapper label.italic {
+	font-style: Italic;
+}
+.form-wrapper label.large {
+	font-size: 120%;
+}
+
+.form-wrapper .select-words {
+	margin: 10px 0;
+	cursor: pointer;
+}
+
+.form-wrapper .select-words span:after {
+	content: "·";
+	margin: 0 5px;
+	color: green;
+	cursor: auto;
+}
+
+.form-wrapper .select-words span:last-child:after {
+	content: "";
+	margin: 0;
+}
+
+.form-wrapper .result,
+.form-wrapper .hide-elem {
+	display: none;
+}
+</style>
+
+<script type="text/template" id="section-tpl">
+	<section id = "s-{{e}}">
+		<label class = "block-label">Which of the following words are similar or related to</label>
+		<label class = "block-label large strong">"{{h}}"?</label>
+		<div class = "select-words">
+			[[ws]]
+		</div>
+		<div class = "result">
+			<input type = "text" name = "{{e}}" size = "100" value = "{{h}}"/>
+			<textarea cols = "80" name = "{{e}}-green" rows = "4"></textarea>
+			<textarea cols = "80" name = "{{e}}-red" rows = "4"></textarea>
+			<input type = "text" name = "{{e}}-ratio" size = "100"/>
+			<textarea cols = "80" name = "{{e}}-x-green" rows = "4"></textarea>
+			<textarea cols = "80" name = "{{e}}-x-red" rows = "4"></textarea>
+			<input type = "text" name = "{{e}}-x-ratio" size = "100"/>
+		</div>
+	</section>
+</script>
+
+<script type="text/template" id="words-tpl">
+	<span data-x = "0">{{w}}</span>
+</script>
+
+<script type="text/template" id="words-x-tpl">
+	<span data-x = "1">{{x}}</span>
+</script>
+
+
+<script type = "text/javascript">
+
+
+// data
+var threeSets = [["Top 10 population countries"],["China", "India", "United States", "Indonesia", "Brazil", "Pakistan", "Nigeria", "Bangladesh", "Russia", "Japan"],["temenos", "NeXTSTEP", "Hyperdontia", "Carlos Sastre", "communication sciences", "booger", "overexpose", "morganite", "Sovietologist"],["Top 5 population countries"],["China", "India", "United States", "Indonesia", "Brazil"],["squalid", "Khakassia", "Astypalaia", "Sofia Kovalevskaya", "registered trademark symbol", "maintopmast", "economised", "Inner Tibet"],["U.S. States - New England"],["Connecticut", "Maine", "Massachusetts", "New Hampshire", "Rhode Island", "Vermont"],["bubbled", "Maasai", "Asplenium", "ewers", "half-birthday", "groundsel", "daydreamt", "for the nonce"]];
+
+// custom settings
+var separator = "@";
+var x_probability = 3;
+
+var variable_section = "s";
+var variable_h = "h";
+var variable_w = "w";
+var variable_x = "x";
+
+////////////////////////////////////////////////////////////
+// rearrange variables
+var qcount = threeSets.length / 3;
+for(var i = 0; i < qcount; i++){
+	var j = i + 1;
+
+	var jsCode = "\
+		var " + variable_h + j + " = " + JSON.stringify(threeSets[i * 3]) + ",\
+			" + variable_w + j + " = " + JSON.stringify(threeSets[i * 3 + 1]) + ",\
+			" + variable_x + j + " = " + JSON.stringify(threeSets[i * 3 + 2]) + ";\
+	";
+	console.log(jsCode);
+
+	eval(jsCode);
+}
+
+/////////////////
+(function($d){
+	//////////////////////////////////
+	//// define global functions
+	
+	// return element object by id
+	var eID = function(id){
+		return $d.getElementById(id);
+	};
+	
+	// return element object by name
+	var eName = function(name){
+		return $d.getElementsByName(name);
+	};
+
+	// return element object by class
+	var eClass = function(className){
+		return $d.getElementsByClassName(className);
+	};
+
+	// return element object by tag name
+	var eTag = function(tagName){
+		return $d.getElementsByTagName(className);
+	};
+	
+	// taggle red/green font color of selected word
+	function toggleClass(element, className){
+		if (!element || !className){
+			return;
+		}
+
+		var classString = element.className, nameIndex = classString.indexOf(className);
+		if (nameIndex == -1) {
+			classString += ' ' + className;
+		}
+		else {
+			classString = classString.substr(0, nameIndex) + classString.substr(nameIndex+className.length);
+		}
+		element.className = classString;
+	}
+
+	// return parent element as selector
+	function closest(el, sel) {
+		if (el == null){
+			return;
+		} else {
+			return el.matches(sel)? el: (el.querySelector(sel) || closest(el.parentNode, sel));
+		}
+	}
+
+	///////////////////////
+	////main function
+	// print words section html
+	var printForm = function(){
+		// get templates
+		var wtpl = eID("words-tpl").innerHTML;
+		var xtpl = eID("words-x-tpl").innerHTML;
+		var stpl = eID("section-tpl").innerHTML;
+
+		var html = "";
+
+		for(var i = 1; i <= qcount; i++){
+			eval("\
+				var h = " + variable_h + i + ",\
+					w = " + variable_w + i + ".sort(function(){\
+													return 0.5 - Math.random();\
+												}),\
+					x = " + variable_x + i + ";\
+			");
+
+			///
+			x_probability = x.length < w.length? (w.length + x.length) / x.length: x_probability;
+			
+			/////
+			var x_original = x.length;
+			var wt = "";
+			for(var j in w){
+				wt += wtpl.replace(/{{w}}/gi, w[j]);
+
+				// add "x" words at random, display probability is 1 / 3
+				if(!Math.floor(Math.random() * x_probability)){
+					var x_i = Math.floor(Math.random() * x.length);
+
+					if(x[x_i]){
+						wt += xtpl.replace(/{{x}}/gi, x[x_i]);
+						x.splice(x_i, 1);
+					}
+				}
+				///////
+			}
+
+			// if not added "x" words
+			if(x_original == x.length){
+				for(var j = 0; j <= Math.floor(Math.random() * x_original); j++){
+					wt += xtpl.replace(/{{x}}/gi, x[j]);
+				}
+			}
+
+			// get html code
+			html += stpl.replace(/{{h}}/gi, h)			// word of section header
+						.replace(/{{e}}/gi, variable_h + i)	// result element id
+						.replace(/\[\[ws\]\]/gi, wt);	// replace words sub-section html
+		}
+		
+		eID("section-wrapper").innerHTML = html;
+
+		return;
+	}
+	
+	// update result
+	var updateResult = function(sectionIndex){
+		if(!sectionIndex){
+			return;
+		}
+
+		var elem = eID(variable_section + "-" + sectionIndex).querySelectorAll(".select-words")[0].querySelectorAll("span");
+		
+		var resultGreen = new Array;
+		var resultRed = new Array;
+		var resultRatio = 0;
+		var resultXgreen = new Array;
+		var resultXred = new Array;
+		var resultXratio = 0;
+
+		for(var i = 0; i < elem.length; i++){
+			if(elem[i].getAttribute("data-x") == "0"){
+				if((elem[i].className).indexOf("red") > -1){
+					resultRed.push(elem[i].textContent);
+				} else {
+					resultGreen.push(elem[i].textContent);
+				}
+			} else {
+				if((elem[i].className).indexOf("red") > -1){
+					resultXred.push(elem[i].textContent);
+				} else {
+					resultXgreen.push(elem[i].textContent);
+				}
+			}
+		}
+		
+		resultXratio = resultXred.length? resultXred.length / (resultXgreen.length + resultXred.length): 0;
+		resultXratio = resultXratio == "NaN"? 0: resultXratio;
+
+		resultRatio = resultRed.length? resultRed.length / (resultGreen.length + resultRed.length): 0;
+		resultRatio = resultRatio == "NaN"? 0: resultRatio;
+
+		// set values to result element
+		eName(sectionIndex + "-green")[0].value = resultGreen.join(separator);
+		eName(sectionIndex + "-red")[0].value = resultRed.join(separator);
+		eName(sectionIndex + "-ratio")[0].value = resultRatio;
+		eName(sectionIndex + "-x-green")[0].value = resultXgreen.join(separator);
+		eName(sectionIndex + "-x-red")[0].value = resultXred.join(separator);
+		eName(sectionIndex + "-x-ratio")[0].value = resultXratio;
+
+		// update total ratio
+		var total_w_ratio = 0;
+		var total_x_ratio = 0;
+
+		for(var i = 1; i <= qcount; i++){
+			total_w_ratio += parseFloat(eName(variable_h + i + "-ratio")[0].value);
+			total_x_ratio += parseFloat(eName(variable_h + i + "-x-ratio")[0].value);
+		}
+
+		eName("total_w_ratio")[0].value = total_w_ratio / qcount;
+		eName("total_x_ratio")[0].value = total_x_ratio / qcount;
+
+		///
+		return
+	};
+	
+	// get results
+	var getResults = function(){
+		var results = new Array;
+		var total_w_ratio = 0;
+		var total_x_ratio = 0;
+
+		for(var i = 1; i <= qcount; i++){
+			total_w_ratio += parseFloat(eName(variable_h + i + "-ratio")[0].value);
+			total_x_ratio += parseFloat(eName(variable_h + i + "-x-ratio")[0].value);
+
+			results.push({
+				index:		variable_h + i,
+				h:			eName(variable_h + i)[0].value,
+				w_green:	eName(variable_h + i + "-green")[0].value,
+				w_red:		eName(variable_h + i + "-red")[0].value,
+				w_ratio:	eName(variable_h + i + "-ratio")[0].value,
+				x_green:	eName(variable_h + i + "-x-green")[0].value,
+				x_red:		eName(variable_h + i + "-x-red")[0].value,
+				x_ratio:	eName(variable_h + i + "-x-ratio")[0].value
+			});
+		}
+		
+		///
+		return {
+			total_w_ratio:	total_w_ratio / qcount,
+			total_x_ratio:	total_x_ratio / qcount,
+			results:		results
+		};
+	};
+	
+	/////////////////////////////////////
+	// start
+	$d.addEventListener("DOMContentLoaded", function(event) { 
+		printForm();
+
+		////
+		var wrapper = eID("section-wrapper").querySelectorAll(".select-words");
+		for(var i = 0; i < wrapper.length; i++){
+			updateResult(variable_h + (i + 1));
+
+			var elem = wrapper[i].querySelectorAll("span");
+			for(var j = 0; j < elem.length; j++){
+				elem[j].addEventListener("click", function(e) {
+					e.preventDefault();
+					toggleClass(this, "red"); // or whatever your active class is
+					
+					updateResult(closest(this, "section").id.replace(/s\-/gi, ""));
+				});
+			}
+		}
+
+		// button to get results
+		eID("getResults").addEventListener("click", function(e) {
+			e.preventDefault();
+			eID("section-results").innerHTML = JSON.stringify(getResults());
+		});
+	});
+
+	/////////////
+})(document);
+
+</script>
+
+<body>
+
+<div class="form-wrapper">
+	<div class="form-header">
+		<label class="block-label desc-title strong">Mark the <font class="red">UNrelated in red</font>. Keep the <font class="green">related in green</font>.</label>
+		<label class="block-label desc-cnt italic">Click words to toggle color. After you identify all the unrelated, submit</label>
+	</div>
+	
+	<form id = "words-form">
+		<input type = "text" id = "total_w_ratio" name = "total_w_ratio" class = "hide-elem" value = "0"/>
+		<input type = "text" id = "total_x_ratio" name = "total_x_ratio" class = "hide-elem" value = "0"/>
+		
+		<div id="section-wrapper"></div>
+	</form>
+
+	<input type="button" id="getResults" value="get results">
+	<div id="section-results"></div>
+</div>
+
+
+
+</body></html>
